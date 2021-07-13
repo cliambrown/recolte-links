@@ -3811,6 +3811,8 @@ __webpack_require__(/*! ./components/urlMetaScraper.js */ "./resources/js/compon
 
 __webpack_require__(/*! ./components/tagList.js */ "./resources/js/components/tagList.js");
 
+__webpack_require__(/*! ./components/link.js */ "./resources/js/components/link.js");
+
 /***/ }),
 
 /***/ "./resources/js/bootstrap.js":
@@ -3841,6 +3843,54 @@ window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 //     cluster: process.env.MIX_PUSHER_APP_CLUSTER,
 //     forceTLS: true
 // });
+
+/***/ }),
+
+/***/ "./resources/js/components/link.js":
+/*!*****************************************!*\
+  !*** ./resources/js/components/link.js ***!
+  \*****************************************/
+/***/ (() => {
+
+window.link = function (id, unread, liked, likesCount) {
+  return {
+    id: id,
+    unread: unread,
+    liked: liked,
+    likes_count: likesCount,
+    loading: false,
+    toggleUnread: function toggleUnread() {
+      var _this = this;
+
+      this.loading = true;
+      axios.post("/api/links/".concat(id, "/update"), {
+        unread: !this.unread
+      }).then(function (response) {
+        _this.unread = !!_.get(response, 'data.unread');
+      })["catch"](function (error) {
+        alert(getReadableAxiosError(error));
+      })["finally"](function () {
+        _this.loading = false;
+      });
+    },
+    toggleLiked: function toggleLiked() {
+      var _this2 = this;
+
+      this.loading = true;
+      axios.post("/api/links/".concat(id, "/update"), {
+        liked: !this.liked
+      }).then(function (response) {
+        _this2.liked = !!_.get(response, 'data.liked');
+        _this2.likes_count = parseInt(_.get(response, 'data.likes_count'));
+        console.log(_.get(response, 'data.likes_count'));
+      })["catch"](function (error) {
+        alert(getReadableAxiosError(error));
+      })["finally"](function () {
+        _this2.loading = false;
+      });
+    }
+  };
+};
 
 /***/ }),
 

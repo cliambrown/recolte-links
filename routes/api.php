@@ -22,5 +22,8 @@ use Illuminate\Support\Facades\Route;
 // Route::group(['middleware' => 'auth:sanctum'], function(){
 
 Route::group(['middleware' => 'auth:sanctum'], function() {
+    
     Route::post('/get_url_metadata', [LinkController::class, 'get_url_metadata']);
+    Route::post('/links/{link}/update', [LinkController::class, 'api_update']);
+    
 });

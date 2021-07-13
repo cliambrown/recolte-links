@@ -3,8 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Link;
+use App\Models\LinkReadStatus;
 use App\Models\Tag;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use PHPHtmlParser\Dom;
 
 class LinkController extends Controller
@@ -16,13 +19,22 @@ class LinkController extends Controller
      */
     public function index()
     {
-        $query = Link::with('tags','user')->orderBy('created_at', 'desc');
+        $query = Link::with([
+                'tags',
+                'user',
+                'read_statuses' => function ($query) {
+                    $query->where('user_id', auth()->user()->id);
+                },
+                'likes',
+            ])
+            ->orderBy('created_at', 'desc');
         if (isset($_GET['tag'])) {
             $query->whereHas('tags', function ($query) {
                 $query->where('name', $_GET['tag']);
             });
         }
         $links = $query->cursorPaginate(20);
+        
         return view('links.index', ['links' => $links]);
     }
 
@@ -98,6 +110,7 @@ class LinkController extends Controller
      */
     public function store(Request $request)
     {
+        
         $request->validate([
             'url' => 'required|url',
             'title' => 'required|string',
@@ -114,6 +127,56 @@ class LinkController extends Controller
         if ($request->is_short) {
             $link->is_short = true;
         }
+        
+        $slackText = '*'.$link->title.'*'."\n";
+        $slackText .= $link->description."\n";
+        $slackText .= $link->url;
+        
+        $response1 = Http::post('https://slack.com/api/chat.postMessage', [
+            'token' => env('SLACK_BOT_TOKEN'),
+            'channel' => env('SLACK_CHANNEL'),
+            'text' => $slackText,
+            'unfurl_links' => false,
+            'unfurl_media' => false,
+        ]);
+        
+        $messagePosted = isset($response1->object()->ok)
+            && ($response1->object()->ok === true || $response1->object()->ok === 'true')
+            && isset($response1->object()->ts);
+        $response2 = null;
+        $response3 = null;
+        
+        if ($messagePosted) {
+            
+            $link->ts = $response1->object()->ts;
+            
+            $response2 = Http::post('https://slack.com/api/chat.postMessage', [
+                'token' => env('SLACK_BOT_TOKEN'),
+                'channel' => env('SLACK_CHANNEL'),
+                'text' => 'posted by '.auth()->user()->name,
+                'thread_ts' => $link->ts,
+            ]);
+            
+            $response3 = Http::post('https://slack.com/api/chat.getPermalink', [
+                'token' => env('SLACK_BOT_TOKEN'),
+                'channel' => env('SLACK_CHANNEL'),
+                'message_ts' => $link->ts,
+            ]);
+            
+        } else {
+            // respond with $response3->object()->error
+        }
+        
+        $gotPermalink = isset($response3->object()->ok)
+            && ($response3->object()->ok === true || $response3->object()->ok === 'true')
+            && isset($response3->object()->permalink);
+        
+        if ($gotPermalink) {
+            $link->slack_url = $response3->object()->permalink;
+        } else {
+            // respond with $response3->object()->error
+        }
+        
         $link->save();
         
         $tagsArr = explode(',', $request->tags);
@@ -164,6 +227,36 @@ class LinkController extends Controller
     public function update(Request $request, Link $link)
     {
         //
+    }
+    
+    public function api_update(Request $request, Link $link) {
+        $request->validate([
+            'unread' => 'nullable|boolean',
+            'liked' => 'nullable|boolean',
+        ]);
+        
+        $unread = $request->unread;
+        if ($unread) {
+            $link->read_statuses()->where('user_id', auth()->user()->id)->delete();
+        } else {
+            $link->read_statuses()->firstOrCreate(['user_id' => auth()->user()->id]);
+        }
+        
+        $liked = $request->liked;
+        if ($liked) {
+            $link->likes()->firstOrCreate(['user_id' => auth()->user()->id]);
+        } else {
+            $link->likes()->where('user_id', auth()->user()->id)->delete();
+        }
+        
+        $link->loadCount('likes');
+        
+        return response()->json([
+            'status' => 'success',
+            'unread' => $unread,
+            'liked' => $liked,
+            'likes_count' => $link->likes_count,
+        ]);
     }
 
     /**
