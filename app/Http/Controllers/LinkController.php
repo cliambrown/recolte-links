@@ -8,6 +8,7 @@ use App\Models\Tag;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use PHPHtmlParser\Dom;
 
 class LinkController extends Controller
@@ -28,14 +29,67 @@ class LinkController extends Controller
                 'likes',
             ])
             ->orderBy('created_at', 'desc');
-        if (isset($_GET['tag'])) {
-            $query->whereHas('tags', function ($query) {
-                $query->where('name', $_GET['tag']);
+        
+        $origQ = null;
+        if (isset($_GET['q'])) {
+            $q = $_GET['q'];
+            $result = preg_match_all('/#([a-zA-Z0-9\-]+)/u', $q, $matches);
+            if ($result) {
+                $origQ = $_GET['q'];
+                foreach ($matches[1] as $tagName) {
+                    $q = str_replace('#'.$tagName, '', $q);
+                    $tagName = trim($tagName);
+                    $tagName = Str::slug($tagName, '-');
+                    if (!$tagName) continue;
+                    $query->whereHas('tags', function ($query) use ($tagName) {
+                        $query->where('name', $tagName);
+                    });
+                }
+            }
+            $q = trim(preg_replace('/\s+/', ' ',$q));
+            if ($q) {
+                $origQ = $_GET['q'];
+                $query->where(function ($query) use ($q) {
+                    $query->where('title', 'like', '%'.$q.'%')
+                            ->orWhere('description', 'like', '%'.$q.'%')
+                            ->orWhere('url', 'like', '%'.$q.'%');
+                });
+            }
+        }
+
+        $get = $_GET;
+        $showUnread = false;
+        if (isset($get['unread'])) {
+            unset($get['unread']);
+            $showUnread = true;
+        } else {
+            $get['unread'] = 'true';
+        }
+        $toggleUnreadUrl = \URL::current() . '?' . http_build_query($get);
+        if ($showUnread) {
+            $query->whereDoesntHave('read_statuses', function ($query) {
+                $query->where('user_id', auth()->user()->id);
             });
         }
-        $links = $query->cursorPaginate(20);
         
-        return view('links.index', ['links' => $links]);
+        $liked = request()->routeIs('liked');
+        if ($liked) {
+            $query->whereHas('likes', function ($query) {
+                $query->where('user_id', auth()->user()->id);
+            });
+        }
+        
+        $links = $query->paginate(10);
+        
+        $data = [
+            'links' => $links,
+            'origQ' => $origQ,
+            'toggleUnreadUrl' => $toggleUnreadUrl,
+            'showUnread' => $showUnread,
+            'liked' => $liked,
+        ];
+        
+        return view('links.index', $data);
     }
 
     /**
@@ -119,6 +173,16 @@ class LinkController extends Controller
             'tags' => 'required|string',
         ]);
         
+        $tagsArr = explode(',', $request->tags);
+        $tagNames = collect([]);
+        foreach ($tagsArr as $tagName) {
+            $tagName = trim($tagName);
+            $tagName = Str::slug($tagName, '-');
+            if (!$tagName) continue;
+            $tagNames->push($tagName);
+        }
+        $tagNames = $tagNames->uniqueStrict();
+        
         $link = new Link;
         $link->user_id = auth()->user()->id;
         $link->url = $request->url;
@@ -129,16 +193,18 @@ class LinkController extends Controller
         }
         
         $slackText = '*'.$link->title.'*'."\n";
-        $slackText .= $link->description."\n";
-        $slackText .= $link->url;
+        $slackText .= $link->url."\n";
+        if ($link->is_short) $slackText .= '[short] ';
+        $slackText .= $link->description;
         
-        $response1 = Http::post('https://slack.com/api/chat.postMessage', [
-            'token' => env('SLACK_BOT_TOKEN'),
-            'channel' => env('SLACK_CHANNEL'),
-            'text' => $slackText,
-            'unfurl_links' => false,
-            'unfurl_media' => false,
-        ]);
+        $response1 = Http::withToken(auth()->user()->slack_token)
+            ->post('https://slack.com/api/chat.postMessage', [
+                'channel' => env('SLACK_CHANNEL'),
+                'text' => $slackText,
+                'as_user' => true,
+                'unfurl_links' => false,
+                'unfurl_media' => false,
+            ]);
         
         $messagePosted = isset($response1->object()->ok)
             && ($response1->object()->ok === true || $response1->object()->ok === 'true')
@@ -148,23 +214,28 @@ class LinkController extends Controller
         
         if ($messagePosted) {
             
-            $link->ts = $response1->object()->ts;
+            $link->slack_ts = $response1->object()->ts;
             
-            $response2 = Http::post('https://slack.com/api/chat.postMessage', [
-                'token' => env('SLACK_BOT_TOKEN'),
-                'channel' => env('SLACK_CHANNEL'),
-                'text' => 'posted by '.auth()->user()->name,
-                'thread_ts' => $link->ts,
-            ]);
+            $response2 = Http::withToken(env('SLACK_BOT_TOKEN'))
+                ->post('https://slack.com/api/chat.postMessage', [
+                    'channel' => env('SLACK_CHANNEL'),
+                    'text' => 'tags: '.$tagNames->implode(', '),
+                    'thread_ts' => $link->slack_ts,
+                ]);
             
-            $response3 = Http::post('https://slack.com/api/chat.getPermalink', [
-                'token' => env('SLACK_BOT_TOKEN'),
-                'channel' => env('SLACK_CHANNEL'),
-                'message_ts' => $link->ts,
-            ]);
+            $response3 = Http::withToken(env('SLACK_BOT_TOKEN'))
+                ->asForm()
+                ->post('https://slack.com/api/chat.getPermalink', [
+                    'channel' => env('SLACK_CHANNEL'),
+                    'message_ts' => $link->slack_ts,
+                ]);
             
         } else {
-            // respond with $response3->object()->error
+            $error = 'Error posting Slack message: '.data_get($response1->object(), 'error', '[unknown error]');
+            return redirect()
+                ->back()
+                ->withInput($request->input())
+                ->withErrors(['msg' => $error]);
         }
         
         $gotPermalink = isset($response3->object()->ok)
@@ -174,16 +245,17 @@ class LinkController extends Controller
         if ($gotPermalink) {
             $link->slack_url = $response3->object()->permalink;
         } else {
-            // respond with $response3->object()->error
+            $error = 'Error getting Slack permalink: '.data_get($response3->object(), 'error', '[unknown error]');
+            return redirect()
+                ->back()
+                ->withInput()
+                ->withErrors(['msg' => $error]);
         }
         
         $link->save();
         
-        $tagsArr = explode(',', $request->tags);
         $tagIDs = [];
-        foreach ($tagsArr as $tagName) {
-            $tagName = trim($tagName);
-            if (!$tagName) continue;
+        foreach ($tagNames as $tagName) {
             $tag = Tag::firstOrCreate(['name' => $tagName]);
             $tagIDs[] = $tag->id;
         }
@@ -214,7 +286,14 @@ class LinkController extends Controller
      */
     public function edit(Link $link)
     {
-        //
+        if ($link->user_id != auth()->user()->id) {
+            abort(403, 'Unauthorized action.');
+        }
+        $allTags = Tag::withCount('links')
+            ->orderBy('links_count', 'desc')
+            ->orderBy('name', 'asc')
+            ->get();
+        return view('links.edit', ['link' => $link, 'allTags' => $allTags]);
     }
 
     /**
@@ -226,30 +305,79 @@ class LinkController extends Controller
      */
     public function update(Request $request, Link $link)
     {
-        //
+        if ($link->user_id != auth()->user()->id) {
+            abort(403, 'Unauthorized action.');
+        }
+        $request->validate([
+            'url' => 'required|url',
+            'title' => 'required|string',
+            'description' => 'required|string',
+            'is_short' => 'nullable|boolean',
+            'tags' => 'required|string',
+        ]);
+        
+        $tagsArr = explode(',', $request->tags);
+        $tagNames = collect([]);
+        foreach ($tagsArr as $tagName) {
+            $tagName = trim($tagName);
+            $tagName = Str::slug($tagName, '-');
+            if (!$tagName) continue;
+            $tagNames->push($tagName);
+        }
+        $tagNames = $tagNames->uniqueStrict();
+        
+        $link->user_id = auth()->user()->id;
+        $link->url = $request->url;
+        $link->title = $request->title;
+        $link->description = $request->description;
+        if ($request->is_short) {
+            $link->is_short = true;
+        } else {
+            $link->is_short = null;
+        }
+        $link->save();
+        
+        $tagIDs = [];
+        foreach ($tagNames as $tagName) {
+            $tag = Tag::firstOrCreate(['name' => $tagName]);
+            $tagIDs[] = $tag->id;
+        }
+        
+        $link->tags()->sync($tagIDs);
+        
+        return redirect()
+            ->back()
+            ->with('status', __('Link updated.'));
     }
     
     public function api_update(Request $request, Link $link) {
         $request->validate([
+            'update_unread' => 'nullable|boolean',
             'unread' => 'nullable|boolean',
+            'update_liked' => 'nullable|boolean',
             'liked' => 'nullable|boolean',
         ]);
         
+        $updateUnread = $request->update_unread;
         $unread = $request->unread;
-        if ($unread) {
-            $link->read_statuses()->where('user_id', auth()->user()->id)->delete();
-        } else {
-            $link->read_statuses()->firstOrCreate(['user_id' => auth()->user()->id]);
+        if ($updateUnread) {
+            if ($unread) {
+                $link->read_statuses()->where('user_id', auth()->user()->id)->delete();
+            } else {
+                $link->read_statuses()->firstOrCreate(['user_id' => auth()->user()->id]);
+            }
         }
         
+        $updateLiked = $request->update_liked;
         $liked = $request->liked;
-        if ($liked) {
-            $link->likes()->firstOrCreate(['user_id' => auth()->user()->id]);
-        } else {
-            $link->likes()->where('user_id', auth()->user()->id)->delete();
+        if ($updateLiked) {
+            if ($liked) {
+                $link->likes()->firstOrCreate(['user_id' => auth()->user()->id]);
+            } else {
+                $link->likes()->where('user_id', auth()->user()->id)->delete();
+            }
+            $link->loadCount('likes');
         }
-        
-        $link->loadCount('likes');
         
         return response()->json([
             'status' => 'success',

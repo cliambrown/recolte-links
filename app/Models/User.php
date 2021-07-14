@@ -21,6 +21,8 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'slack_id',
+        'slack_token',
     ];
 
     /**

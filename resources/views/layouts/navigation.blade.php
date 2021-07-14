@@ -16,6 +16,11 @@
                         {{ __('Home') }}
                     </x-nav-link>
                 </div>
+                <div class="hidden space-x-8 sm:-my-px sm:ml-10 sm:flex">
+                    <x-nav-link :href="route('liked')" :active="request()->routeIs('liked')">
+                        {{ __('Liked') }}
+                    </x-nav-link>
+                </div>
             </div>
 
             <!-- Settings Dropdown -->
@@ -65,6 +70,9 @@
         <div class="pt-2 pb-3 space-y-1">
             <x-responsive-nav-link :href="route('home')" :active="request()->routeIs('home')">
                 {{ __('Home') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('liked')" :active="request()->routeIs('liked')">
+                {{ __('Liked') }}
             </x-responsive-nav-link>
         </div>
 

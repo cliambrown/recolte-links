@@ -11,8 +11,15 @@
 
         <!-- Validation Errors -->
         <x-auth-validation-errors class="mb-4" :errors="$errors" />
+        
+        <div class="text-center">
+            <x-button btncolor="blue" href="/auth/redirect">
+                <x-icons.slack class="w-6 mr-2 relative -left-1"></x-icons.slack>
+                Sign in with Slack
+            </x-button>
+        </div>
 
-        <form method="POST" action="{{ route('login') }}">
+        {{-- <form method="POST" action="{{ route('login') }}">
             @csrf
 
             <!-- Email Address -->
@@ -51,6 +58,7 @@
                     {{ __('Log in') }}
                 </x-button>
             </div>
-        </form>
+        </form> --}}
+        
     </x-auth-card>
 </x-guest-layout>

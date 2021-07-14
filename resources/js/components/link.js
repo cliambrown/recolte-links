@@ -8,6 +8,7 @@ window.link = function (id, unread, liked, likesCount) {
         toggleUnread() {
             this.loading = true;
             axios.post(`/api/links/${id}/update`, {
+                update_unread: true,
                 unread: (!this.unread)
             }).then(response => {
                 this.unread = !!_.get(response, 'data.unread');
@@ -20,6 +21,7 @@ window.link = function (id, unread, liked, likesCount) {
         toggleLiked() {
             this.loading = true;
             axios.post(`/api/links/${id}/update`, {
+                update_liked: true,
                 liked: (!this.liked)
             }).then(response => {
                 this.liked = !!_.get(response, 'data.liked');
