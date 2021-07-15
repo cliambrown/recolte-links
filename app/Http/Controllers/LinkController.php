@@ -272,6 +272,11 @@ class LinkController extends Controller
         
         $link->tags()->sync($tagIDs);
         
+        LinkReadStatus::create([
+            'link_id' => $link->id,
+            'user_id' => auth()->user()->id,
+        ]);
+        
         return redirect()
             ->route('home')
             ->with('status', __('New link saved.'));
