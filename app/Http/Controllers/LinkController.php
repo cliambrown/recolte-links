@@ -438,7 +438,9 @@ class LinkController extends Controller
         }
         if (!$error) {
             $reaction = data_get($event, 'reaction');
-            if ($reaction !== 'thumbsup' && $reaction !== 'heavy_check_mark') $error = 'Invalid reaction: '.$reaction;
+            if ($reaction !== 'thumbsup' && $reaction !== '+1' && $reaction !== 'heavy_check_mark') {
+                $error = 'Invalid reaction: '.$reaction;
+            }
         }
         if (!$error) {
             $channel = data_get($event, 'item.channel');
@@ -464,7 +466,7 @@ class LinkController extends Controller
         if ($error) {
             Log::info('Slack event error: '.$error);
         } else {
-            if ($reaction === 'thumbsup') {
+            if ($reaction === 'thumbsup' || $reaction === '+1') {
                 if ($type === 'reaction_added') {
                     UserLike::firstOrCreate([
                         'link_id' => $link->id,
