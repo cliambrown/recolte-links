@@ -430,18 +430,22 @@ class LinkController extends Controller
         
         $error = null;
         
-        $type = data_get($request, 'type');
-        if ($type !== 'reaction_added' && $type !== 'reaction_removed') $error = 'Invalid event type: '.$type;
+        $event = data_get($request, 'event');
+        if (!$event) $error = 'Could not retrieve event.';
         if (!$error) {
-            $reaction = data_get($request, 'reaction');
+            $type = data_get($event, 'type');
+            if ($type !== 'reaction_added' && $type !== 'reaction_removed') $error = 'Invalid event type: '.$type;
+        }
+        if (!$error) {
+            $reaction = data_get($event, 'reaction');
             if ($reaction !== 'thumbsup' && $reaction !== 'heavy_check_mark') $error = 'Invalid reaction: '.$reaction;
         }
         if (!$error) {
-            $channel = data_get($request, 'item.channel');
+            $channel = data_get($event, 'item.channel');
             if ($channel !== env('SLACK_CHANNEL')) $error = 'Invalid channel: '.$channel;
         }
         if (!$error) {
-            $slackID = data_get($request, 'user');
+            $slackID = data_get($event, 'user');
             if (!$slackID) $error = 'Could not retrieve Slack ID from payload.';
         }
         if (!$error) {
@@ -449,7 +453,7 @@ class LinkController extends Controller
             if (!$user) $error = 'User not found. Slack ID: '.$slackID;
         }
         if (!$error) {
-            $slackTS = data_get($request, 'item.ts');
+            $slackTS = data_get($event, 'item.ts');
             if (!$slackTS) $error = 'Could not retrieve Slack timestamp from payload.';
         }
         if (!$error) {
