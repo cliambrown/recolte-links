@@ -216,7 +216,7 @@ class LinkController extends Controller
         $slackText .= $link->url."\n";
         if ($link->is_short) $slackText .= '[short] ';
         $slackText .= $link->description."\n";
-        $slackText .= 'Tags: '.$tagNames->implode(', ');
+        $slackText .= '_tags: '.$tagNames->implode(', ').'_';
         
         $response1 = Http::withToken(auth()->user()->slack_token)
             ->post('https://slack.com/api/chat.postMessage', [
