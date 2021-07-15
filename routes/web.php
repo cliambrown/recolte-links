@@ -64,5 +64,7 @@ Route::get('/auth/callback', function () {
 
 Route::post('/slack-event-endpoint', [LinkController::class, 'slack_event'])
     ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+Route::get('/slack-event-endpoint', [LinkController::class, 'slack_event'])
+    ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
 
 require __DIR__.'/auth.php';
