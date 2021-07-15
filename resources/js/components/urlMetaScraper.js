@@ -16,7 +16,10 @@ window.urlMetaScraper = function (url, title, description) {
                 url: this.url
             }).then(response => {
                 this.title = _.get(response, 'data.title');
-                this.description = _.get(response, 'data.description');
+                let description = _.get(response, 'data.description');
+                if (description.trim()) {
+                    this.description = '"' + description + '"';
+                }
             }).catch(error => {
                 alert(getReadableAxiosError(error));
             }).finally(() => {
