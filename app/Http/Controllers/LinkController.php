@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Link;
 use App\Models\LinkReadStatus;
 use App\Models\Tag;
+use App\Models\User;
+use App\Models\UserLike;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -419,8 +421,47 @@ class LinkController extends Controller
     }
     
     public function slack_event(Request $request) {
-        $challenge = $request->challenge;
-        return response()->json(['challenge' => $request->challenge]);
+        // This was needed for initial url validation
+        // return response()->json(['challenge' => $request->challenge]);
+        
+        $type = data_get($request, 'type');
+        if ($type !== 'reaction_added' && $type !== 'reaction_removed') return false;
+        $reaction = data_get($request, 'reaction');
+        if ($reaction !== 'thumbsup' && $reaction !== 'heavy_check_mark') return false;
+        $channel = data_get($request, 'item.channel');
+        if ($channel !== env('SLACK_CHANNEL')) return false;
+        $slackID = data_get($request, 'user');
+        if (!$slackID) return false;
+        $user = User::where('slack_id', $slackID)->first();
+        if (!$user) return false;
+        $slackTS = data_get($request, 'item.ts');
+        if (!$slackTS) return false;
+        $link = Link::where('slack_ts', $slackTS)->first();
+        if (!$link) return false;
+        
+        if ($reaction === 'thumbsup') {
+            if ($type === 'reaction_added') {
+                UserLike::firstOrCreate([
+                    'link_id' => $link->id,
+                    'user_id' => $user->id,
+                ]);
+            } else {
+                UserLike::where('link_id', $link->id)
+                    ->where('user_id', $user->id)
+                    ->delete();
+            }
+        } elseif ($reaction === 'heavy_check_mark') {
+            if ($type === 'reaction_added') {
+                LinkReadStatus::firstOrCreate([
+                    'link_id' => $link->id,
+                    'user_id' => $user->id,
+                ]);
+            } else {
+                LinkReadStatus::where('link_id', $link->id)
+                    ->where('user_id', $user->id)
+                    ->delete();
+            }
+        }
     }
     
     public function delete(Link $link)

@@ -27,7 +27,7 @@ class Link extends Model
     }
     
     public function likes() {
-        return $this->hasMany(UserLikes::class);
+        return $this->hasMany(UserLike::class);
     }
     
     public function getLikedAttribute() {

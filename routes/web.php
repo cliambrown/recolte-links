@@ -65,13 +65,4 @@ Route::get('/auth/callback', function () {
 Route::post('/slack-event-endpoint', [LinkController::class, 'slack_event'])
     ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
 
-Route::get('/slack-test', function () {
-    $response = Http::post(env('APP_URL').'/slack-event-endpoint', [
-        "token" => "Jhj5dZrVaK7ZwHHjRyZWjbDl",
-        "challenge" => "3eZbrw1aBm2rZgRNFdxV2595E9CY3gmdALWMmHkvFXO7tYXAYM8P",
-        "type" => "url_verification"
-    ]);
-    dd($response);
-});
-
 require __DIR__.'/auth.php';
