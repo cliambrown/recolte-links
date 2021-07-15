@@ -62,7 +62,8 @@ Route::get('/auth/callback', function () {
     return redirect()->route('home');
 });
 
-Route::post('/slack-event-endpoint', [LinkController::class, 'slack_event']);
+Route::post('/slack-event-endpoint', [LinkController::class, 'slack_event'])
+    ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
 
 Route::get('/slack-test', function () {
     $response = Http::post(env('APP_URL').'/slack-event-endpoint', [
