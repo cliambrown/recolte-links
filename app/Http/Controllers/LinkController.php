@@ -462,6 +462,9 @@ class LinkController extends Controller
                     ->delete();
             }
         }
+        return response('OK', 200)
+            ->header('Content-Type', 'text/plain');
+});
     }
     
     public function delete(Link $link)
