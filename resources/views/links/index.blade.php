@@ -1,5 +1,13 @@
 <x-app-layout>
     
+    @if (request()->routeIs('liked'))
+        <x-slot name="header">
+            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+                {{ __('Links you have liked') }}
+            </h2>
+        </x-slot>
+    @endif
+    
     <div class="sm:flex sm:justify-between mb-8">
         
         <x-button href="{{ route('links.create'); }}" btncolor="green" class="mr-4 whitespace-nowrap">
@@ -7,11 +15,11 @@
             Add Link
         </x-button>
         
-        <x-button :href="$toggleUnreadUrl" btncolor="transparent" class="ml-auto text-green-700 hover:text-green-900">
-            Show {{ $showUnread ? 'all' : 'unread' }}
+        <x-button href="{{ $unreadUrl }}" btncolor="transparent" class="ml-auto mr-2 text-green-700 hover:text-green-900">
+            Unread
         </x-button>
         
-        <form method="GET" action="./" class="block max-w-md mt-4 sm:mt-0 relative">
+        <form method="GET" action="{{ \URL::current() }}" class="block max-w-md mt-4 sm:mt-0 relative">
             <label for="q" class="sr-only">Search Links</label>
             <x-input id="q" class="block w-full pr-10" type="text" name="q" value="{{ $origQ }}" />
             <x-button btncolor="transparent" class="absolute inset-y-0 right-0">
@@ -30,7 +38,7 @@
     @if ($origQ)
         <div class="text-purple-600 mb-4">
             Search results for "<span class="font-semibold">{{ $origQ }}</span>"
-            <a href="./" class="text-green-700 ml-3 hover:text-green-900 transition-all">
+            <a href="{{ \URL::current() }}" class="text-green-700 ml-3 hover:text-green-900 transition-all">
                 <x-icons.close class="w-6 -my-2 relative bottom-0.5 -mr-0.5"></x-icons.close>
                 Clear
             </a>
@@ -38,7 +46,7 @@
     @endif
     
     @foreach ($links as $link)
-        <div x-data="link({{ $link->id }}, {{ $link->unread ? 'true' : 'false' }}, {{ $link->liked ? 'true' : 'false' }}, {{ $link->likes->count() }})" class="mb-4 px-6 py-4 bg-white shadow-md overflow-hidden border-l-4 border-transparent opacity-75 link" :class="{ 'unread': unread }">
+        <div x-data="link({{ $link->id }}, {{ $link->unread ? 'true' : 'false' }}, {{ $link->liked ? 'true' : 'false' }}, {{ $link->likes->count() }})" class="mb-4 px-6 py-4 bg-white overflow-hidden border-l-4 border-transparent opacity-75 link" :class="{ 'unread': unread }">
             
             @if ($link->is_short)
                 <div class="float-left bg-purple-700 text-white font-semibold rounded-sm px-2 py-0.5 text-xs mr-2 relative top-0.5">
@@ -72,13 +80,18 @@
                             <x-icons.edit class="w-6 -m-2"></x-icons.edit>
                         </x-button>
                     @endif
-                    <x-button btncolor="transparent" x-bind:title="(unread ? 'Mark read' : 'Mark unread')" x-on:click="toggleUnread" x-bind:class="{ 'text-green-600': !unread, 'text-purple-500': unread }">
-                        <x-icons.eye x-show="unread" class="w-6 -m-2"></x-icons.eye>
+                    <x-button btncolor="transparent" x-bind:title="(unread ? 'Mark read' : 'Mark unread')" x-on:click="toggleUnread" x-bind:class="{ 'text-green-600': unread, 'text-purple-700': !unread }">
+                        {{-- <x-icons.eye x-show="unread" class="w-6 -m-2"></x-icons.eye>
+                        <x-icons.eye-off x-show="!unread" class="w-6 -m-2 cloak"></x-icons.eye-off> --}}
+                        <x-icons.check x-show="unread" class="w-6 -m-2"></x-icons.check>
                         <x-icons.eye-off x-show="!unread" class="w-6 -m-2 cloak"></x-icons.eye-off>
                     </x-button>
-                    <x-button btncolor="transparent" x-bind:title="(liked ? 'Remove like' : 'Like this link')" x-on:click="toggleLiked" x-bind:class="{ 'text-gray-600': !liked, 'text-pink-600': liked }">
-                        <x-icons.heart-filled x-show="liked" class="w-6 -m-2"></x-icons.heart-filled>
-                        <x-icons.heart x-show="!liked" class="w-6 -m-2 cloak"></x-icons.heart>
+                    <x-button btncolor="transparent" x-bind:title="(liked ? 'Remove like' : 'Like this link')" x-on:click="toggleLiked" x-bind:class="{ 'text-gray-500': !liked, 'text-pink-600': liked }">
+                        {{-- <x-icons.heart-filled x-show="liked" class="w-6 -m-2"></x-icons.heart-filled>
+                        <x-icons.heart x-show="!liked" class="w-6 -m-2 cloak"></x-icons.heart> --}}
+                        {{-- <x-icons.thumbsup-filled x-show="liked" class="w-6 -m-2"></x-icons.thumbsup-filled>
+                        <x-icons.thumbsup x-show="!liked" class="w-6 -m-2 cloak"></x-icons.thumbsup> --}}
+                        <x-icons.thumbsup class="w-6 -m-2 stroke-current" x-bind:class="{ 'fill-current': liked }"></x-icons.thumbsup>
                     </x-button>
                     <span class="inline-block w-8 text-left text-sm" x-text="likes_count"></span>
                     <x-button btncolor="transparent" :href="$link->slack_url" target="_blank">

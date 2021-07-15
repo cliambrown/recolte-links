@@ -29,9 +29,11 @@ Route::middleware(['auth'])->group(function () {
     
     Route::get('/', [LinkController::class, 'index'])->name('home');
     Route::resource('links', LinkController::class)->except(['index']);
+    Route::get('/links/{link}/delete', [LinkController::class, 'delete'])->name('links.delete');
     
     Route::get('/liked', [LinkController::class, 'index'])->name('liked');
     
+    // DEBUG
     // Route::get('/get_url_metadata', [LinkController::class, 'get_url_metadata']);
     
 });
@@ -41,15 +43,12 @@ Route::get('/auth/redirect', function () {
 });
 
 Route::get('/auth/callback', function () {
-    
     $slackUser = Socialite::driver('slack')->user();
-    
     if ($slackUser->organization_id !== env('SLACK_TEAM_ID')) {
         return redirect()
             ->route('login')
             ->withErrors(['msg' => 'Your Slack account does not seem to be a part of our team.']);
     }
-    
     $user = User::firstOrCreate(
         ['slack_id' => $slackUser->getId()],
         [
@@ -58,10 +57,10 @@ Route::get('/auth/callback', function () {
             'slack_token' => $slackUser->token,
         ]
     );
-    
     Auth::login($user, true);
-    
     return redirect()->route('home');
 });
+
+Route::post('/slack-event-endpoint', [LinkController::class, 'slack_event']);
 
 require __DIR__.'/auth.php';

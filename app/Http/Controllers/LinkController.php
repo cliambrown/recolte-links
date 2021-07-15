@@ -33,6 +33,7 @@ class LinkController extends Controller
         $origQ = null;
         if (isset($_GET['q'])) {
             $q = $_GET['q'];
+            // Check for tags
             $result = preg_match_all('/#([a-zA-Z0-9\-]+)/u', $q, $matches);
             if ($result) {
                 $origQ = $_GET['q'];
@@ -46,6 +47,26 @@ class LinkController extends Controller
                     });
                 }
             }
+            // Check for unread
+            $result = preg_match('/((^|\s)is\:unread(\s|$))/', $q, $matches);
+            if ($result === 1 && count($matches) >= 2) {
+                $origQ = $_GET['q'];
+                $q = str_replace($matches[1], '', $q);
+                $query->whereDoesntHave('read_statuses', function ($query) {
+                    $query->where('user_id', auth()->user()->id);
+                });
+            }
+            // Check for from:user
+            $result = preg_match('/((^|\s)from\:([a-zA-Z]+)(\s|$))/', $q, $matches);
+            if ($result === 1 && count($matches) >= 2) {
+                $origQ = $_GET['q'];
+                $q = str_replace($matches[1], '', $q);
+                $fromName = $matches[3];
+                $query->whereHas('user', function ($query) use ($fromName) {
+                    $query->where('name', 'like', '%'.$fromName.'%');
+                });
+            }
+            // Search using remainder of query
             $q = trim(preg_replace('/\s+/', ' ',$q));
             if ($q) {
                 $origQ = $_GET['q'];
@@ -58,19 +79,16 @@ class LinkController extends Controller
         }
 
         $get = $_GET;
-        $showUnread = false;
-        if (isset($get['unread'])) {
-            unset($get['unread']);
-            $showUnread = true;
+        if (isset($get['q'])) {
+            $q = $get['q'];
+            $result = preg_match('/((^|\s)is\:unread(\s|$))/', $q, $matches);
+            if ($result !== 1) {
+                $get['q'] = trim($q.' is:unread');
+            }
         } else {
-            $get['unread'] = 'true';
+            $get['q'] = 'is:unread';
         }
-        $toggleUnreadUrl = \URL::current() . '?' . http_build_query($get);
-        if ($showUnread) {
-            $query->whereDoesntHave('read_statuses', function ($query) {
-                $query->where('user_id', auth()->user()->id);
-            });
-        }
+        $unreadUrl = \URL::current().'?'.http_build_query($get);
         
         $liked = request()->routeIs('liked');
         if ($liked) {
@@ -84,8 +102,7 @@ class LinkController extends Controller
         $data = [
             'links' => $links,
             'origQ' => $origQ,
-            'toggleUnreadUrl' => $toggleUnreadUrl,
-            'showUnread' => $showUnread,
+            'unreadUrl' => $unreadUrl,
             'liked' => $liked,
         ];
         
@@ -196,6 +213,7 @@ class LinkController extends Controller
         $slackText .= $link->url."\n";
         if ($link->is_short) $slackText .= '[short] ';
         $slackText .= $link->description;
+        $slackText .= 'tags: '.$tagNames->implode(', ');
         
         $response1 = Http::withToken(auth()->user()->slack_token)
             ->post('https://slack.com/api/chat.postMessage', [
@@ -210,26 +228,15 @@ class LinkController extends Controller
             && ($response1->object()->ok === true || $response1->object()->ok === 'true')
             && isset($response1->object()->ts);
         $response2 = null;
-        $response3 = null;
         
         if ($messagePosted) {
-            
             $link->slack_ts = $response1->object()->ts;
-            
             $response2 = Http::withToken(env('SLACK_BOT_TOKEN'))
-                ->post('https://slack.com/api/chat.postMessage', [
-                    'channel' => env('SLACK_CHANNEL'),
-                    'text' => 'tags: '.$tagNames->implode(', '),
-                    'thread_ts' => $link->slack_ts,
-                ]);
-            
-            $response3 = Http::withToken(env('SLACK_BOT_TOKEN'))
                 ->asForm()
                 ->post('https://slack.com/api/chat.getPermalink', [
                     'channel' => env('SLACK_CHANNEL'),
                     'message_ts' => $link->slack_ts,
                 ]);
-            
         } else {
             $error = 'Error posting Slack message: '.data_get($response1->object(), 'error', '[unknown error]');
             return redirect()
@@ -238,14 +245,14 @@ class LinkController extends Controller
                 ->withErrors(['msg' => $error]);
         }
         
-        $gotPermalink = isset($response3->object()->ok)
-            && ($response3->object()->ok === true || $response3->object()->ok === 'true')
-            && isset($response3->object()->permalink);
+        $gotPermalink = isset($response2->object()->ok)
+            && ($response2->object()->ok === true || $response2->object()->ok === 'true')
+            && isset($response2->object()->permalink);
         
         if ($gotPermalink) {
-            $link->slack_url = $response3->object()->permalink;
+            $link->slack_url = $response2->object()->permalink;
         } else {
-            $error = 'Error getting Slack permalink: '.data_get($response3->object(), 'error', '[unknown error]');
+            $error = 'Error getting Slack permalink: '.data_get($response2->object(), 'error', '[unknown error]');
             return redirect()
                 ->back()
                 ->withInput()
@@ -363,8 +370,20 @@ class LinkController extends Controller
         if ($updateUnread) {
             if ($unread) {
                 $link->read_statuses()->where('user_id', auth()->user()->id)->delete();
+                $response = Http::withToken(auth()->user()->slack_token)
+                    ->post('https://slack.com/api/reactions.remove', [
+                        'channel' => env('SLACK_CHANNEL'),
+                        'name' => 'heavy_check_mark',
+                        'timestamp' => $link->slack_ts,
+                    ]);
             } else {
                 $link->read_statuses()->firstOrCreate(['user_id' => auth()->user()->id]);
+                $response = Http::withToken(auth()->user()->slack_token)
+                    ->post('https://slack.com/api/reactions.add', [
+                        'channel' => env('SLACK_CHANNEL'),
+                        'name' => 'heavy_check_mark',
+                        'timestamp' => $link->slack_ts,
+                    ]);
             }
         }
         
@@ -373,8 +392,20 @@ class LinkController extends Controller
         if ($updateLiked) {
             if ($liked) {
                 $link->likes()->firstOrCreate(['user_id' => auth()->user()->id]);
+                $response = Http::withToken(auth()->user()->slack_token)
+                    ->post('https://slack.com/api/reactions.add', [
+                        'channel' => env('SLACK_CHANNEL'),
+                        'name' => 'thumbsup',
+                        'timestamp' => $link->slack_ts,
+                    ]);
             } else {
                 $link->likes()->where('user_id', auth()->user()->id)->delete();
+                $response = Http::withToken(auth()->user()->slack_token)
+                    ->post('https://slack.com/api/reactions.remove', [
+                        'channel' => env('SLACK_CHANNEL'),
+                        'name' => 'thumbsup',
+                        'timestamp' => $link->slack_ts,
+                    ]);
             }
             $link->loadCount('likes');
         }
@@ -386,6 +417,21 @@ class LinkController extends Controller
             'likes_count' => $link->likes_count,
         ]);
     }
+    
+    public function slack_event(Request $request) {
+        $challenge = $request->challenge;
+        echo 'HTTP 200 OK'.PHP_EOL;
+        echo 'Content-type: text/plain'.PHP_EOL;
+        echo $challenge;
+    }
+    
+    public function delete(Link $link)
+    {
+        if ($link->user_id != auth()->user()->id) {
+            abort(403, 'Unauthorized action.');
+        }
+        return view('links.delete', ['link' => $link]);
+    }
 
     /**
      * Remove the specified resource from storage.
@@ -395,6 +441,15 @@ class LinkController extends Controller
      */
     public function destroy(Link $link)
     {
-        //
+        if ($link->user_id != auth()->user()->id) {
+            abort(403, 'Unauthorized action.');
+        }
+        $link->tags()->sync([]);
+        $link->read_statuses()->delete();
+        $link->likes()->delete();
+        $link->delete();
+        return redirect()
+            ->route('home')
+            ->with('status', __('Link deleted.'));
     }
 }

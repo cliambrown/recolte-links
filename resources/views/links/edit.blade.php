@@ -1,5 +1,10 @@
 <x-app-layout>
+    
     <x-slot name="header">
+        <div class="float-right ml-4 mb-4 -mt-2">
+            <x-button href="{{ route('links.delete', ['link' => $link->id]) }}" btncolor="red">Delete</x-button>
+        </div>
+        
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">
             {{ __('Edit Link') }}
         </h2>

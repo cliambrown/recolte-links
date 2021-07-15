@@ -12,5 +12,5 @@ svg {
     @apply opacity-75 rounded-lg;
 }
 .link.unread {
-    @apply border-purple-500 bg-white opacity-100 rounded-r-lg;
+    @apply border-purple-500 bg-white opacity-100 rounded-r-lg shadow-md;
 }
