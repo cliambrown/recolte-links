@@ -215,8 +215,8 @@ class LinkController extends Controller
         $slackText = '*'.$link->title.'*'."\n";
         $slackText .= $link->url."\n";
         if ($link->is_short) $slackText .= '[short] ';
-        $slackText .= $link->description;
-        $slackText .= 'tags: '.$tagNames->implode(', ');
+        $slackText .= $link->description."\n";
+        $slackText .= 'Tags: '.$tagNames->implode(', ');
         
         $response1 = Http::withToken(auth()->user()->slack_token)
             ->post('https://slack.com/api/chat.postMessage', [
@@ -318,6 +318,7 @@ class LinkController extends Controller
         if ($link->user_id != auth()->user()->id) {
             abort(403, 'Unauthorized action.');
         }
+        
         $request->validate([
             'url' => 'required|url',
             'title' => 'required|string',
@@ -425,7 +426,7 @@ class LinkController extends Controller
         // This was needed for initial url validation
         // return response()->json(['challenge' => $request->challenge]);
         
-        Log::info('Incoming Slack event');
+        Log::info('Incoming Slack event: '.json_encode($request->all()));
         
         $error = null;
         
