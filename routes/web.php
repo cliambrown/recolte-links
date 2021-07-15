@@ -3,6 +3,7 @@
 use App\Http\Controllers\LinkController;
 use App\Http\Controllers\SocialController;
 use App\Models\User;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Laravel\Socialite\Facades\Socialite;
 
@@ -62,5 +63,14 @@ Route::get('/auth/callback', function () {
 });
 
 Route::post('/slack-event-endpoint', [LinkController::class, 'slack_event']);
+
+Route::get('/slack-test', function () {
+    $response = Http::post(env('APP_URL').'/slack-event-endpoint', [
+        "token" => "Jhj5dZrVaK7ZwHHjRyZWjbDl",
+        "challenge" => "3eZbrw1aBm2rZgRNFdxV2595E9CY3gmdALWMmHkvFXO7tYXAYM8P",
+        "type" => "url_verification"
+    ]);
+    dd($response);
+});
 
 require __DIR__.'/auth.php';

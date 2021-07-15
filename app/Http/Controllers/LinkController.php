@@ -420,9 +420,7 @@ class LinkController extends Controller
     
     public function slack_event(Request $request) {
         $challenge = $request->challenge;
-        echo 'HTTP 200 OK'.PHP_EOL;
-        echo 'Content-type: text/plain'.PHP_EOL;
-        echo $challenge;
+        return response()->json(['challenge' => $request->challenge]);
     }
     
     public function delete(Link $link)
