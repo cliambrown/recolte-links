@@ -48,7 +48,7 @@ Route::get('/auth/callback', function () {
     if ($slackUser->organization_id !== env('SLACK_TEAM_ID')) {
         return redirect()
             ->route('login')
-            ->withErrors(['msg' => 'Your Slack account does not seem to be a part of our team.']);
+            ->withErrors(['msg' => 'Your Slack account does not seem to be a part of our team. Org id: '.$slackUser->organization_id]);
     }
     $user = User::firstOrCreate(
         ['slack_id' => $slackUser->getId()],
