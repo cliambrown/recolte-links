@@ -56,7 +56,7 @@
             
             <div class="font-semibold">{{ $link->title }}</div>
             
-            <a href="{{ $link->url }}" class="text-blue-700 hover:text-blue-900 transition-all inline-flex max-w-full">
+            <a href="{{ $link->url }}" target="_blank" class="text-blue-700 hover:text-blue-900 transition-all inline-flex max-w-full">
                 <div class="overflow-hidden overflow-ellipsis">{{ $link->url }}</div>
                 <div class="pl-2"><x-icons.open class="w-4 -my-2 relative bottom-0.5"></x-icons.open></div>
             </a>
