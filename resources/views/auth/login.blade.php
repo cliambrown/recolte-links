@@ -1,4 +1,36 @@
 <x-guest-layout>
+    <div class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-gray-100">
+        <div>
+            <a href="/">
+                <x-application-logo class="w-20 h-20 fill-current text-gray-500" />
+            </a>
+        </div>
+        
+        <div class="mt-4 text-lg font-semibold">
+            Récolte Links
+        </div>
+
+        <div class="w-full sm:max-w-md mt-4 px-6 py-4">
+            
+            <!-- Session Status -->
+            <x-auth-session-status class="mb-4" :status="session('status')" />
+
+            <!-- Validation Errors -->
+            <x-auth-validation-errors class="mb-4" :errors="$errors" />
+            
+            <div class="text-center">
+                <x-button btncolor="blue" href="/auth/redirect">
+                    <x-icons.slack class="w-6 mr-2 relative -left-1"></x-icons.slack>
+                    Sign in with Slack
+                </x-button>
+            </div>
+            
+        </div>
+    </div>
+</x-guest-layout>
+
+{{-- 
+<x-guest-layout>
     <x-auth-card>
         <x-slot name="logo">
             <a href="/">
@@ -11,15 +43,8 @@
 
         <!-- Validation Errors -->
         <x-auth-validation-errors class="mb-4" :errors="$errors" />
-        
-        <div class="text-center">
-            <x-button btncolor="blue" href="/auth/redirect">
-                <x-icons.slack class="w-6 mr-2 relative -left-1"></x-icons.slack>
-                Sign in with Slack
-            </x-button>
-        </div>
 
-        {{-- <form method="POST" action="{{ route('login') }}">
+        <form method="POST" action="{{ route('login') }}">
             @csrf
 
             <!-- Email Address -->
@@ -58,7 +83,7 @@
                     {{ __('Log in') }}
                 </x-button>
             </div>
-        </form> --}}
+        </form>
         
     </x-auth-card>
-</x-guest-layout>
+</x-guest-layout> --}}
