@@ -18,18 +18,10 @@ use Laravel\Socialite\Facades\Socialite;
 |
 */
 
-// Route::get('/', function () {
-//     return view('welcome');
-// });
-
-// Route::get('/dashboard', function () {
-//     return view('dashboard');
-// })->middleware(['auth'])->name('dashboard');
-
 Route::middleware(['auth'])->group(function () {
     
     Route::get('/', [LinkController::class, 'index'])->name('home');
-    Route::resource('links', LinkController::class)->except(['index']);
+    Route::resource('links', LinkController::class)->except(['index','show']);
     Route::get('/links/{link}/delete', [LinkController::class, 'delete'])->name('links.delete');
     
     Route::get('/liked', [LinkController::class, 'index'])->name('liked');

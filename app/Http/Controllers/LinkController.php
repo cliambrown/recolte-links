@@ -27,20 +27,24 @@ class LinkController extends Controller
                 'tags',
                 'user',
                 'read_statuses' => function ($query) {
+                    // Retrieve only the current user's read status
                     $query->where('user_id', auth()->user()->id);
                 },
                 'likes',
             ])
             ->orderBy('created_at', 'desc');
         
+        // Store the original user search query for display in the search box
         $origQ = null;
+        
         if (isset($_GET['q'])) {
             $q = $_GET['q'];
-            // Check for tags
+            // Check for tags in search query (hashtag format)
             $result = preg_match_all('/#([a-zA-Z0-9\-]+)/u', $q, $matches);
             if ($result) {
                 $origQ = $_GET['q'];
                 foreach ($matches[1] as $tagName) {
+                    // Remove tags from search query
                     $q = str_replace('#'.$tagName, '', $q);
                     $tagName = trim($tagName);
                     $tagName = Str::slug($tagName, '-');
@@ -50,19 +54,21 @@ class LinkController extends Controller
                     });
                 }
             }
-            // Check for unread
+            // Check for unread ("is:unread")
             $result = preg_match('/((^|\s)is\:unread(\s|$))/', $q, $matches);
             if ($result === 1 && count($matches) >= 2) {
                 $origQ = $_GET['q'];
+                // Remove "is:unread" from search query
                 $q = str_replace($matches[1], '', $q);
                 $query->whereDoesntHave('read_statuses', function ($query) {
                     $query->where('user_id', auth()->user()->id);
                 });
             }
-            // Check for from:user
+            // Check for "from:name" (including partial matches)
             $result = preg_match('/((^|\s)from\:([a-zA-Z]+)(\s|$))/', $q, $matches);
             if ($result === 1 && count($matches) >= 2) {
                 $origQ = $_GET['q'];
+                // Remove "from:name" from search query
                 $q = str_replace($matches[1], '', $q);
                 $fromName = $matches[3];
                 $query->whereHas('user', function ($query) use ($fromName) {
@@ -80,19 +86,15 @@ class LinkController extends Controller
                 });
             }
         }
-
+        
+        // Generate a link to Unread by adding "is:unread" to current search query
         $get = $_GET;
-        if (isset($get['q'])) {
-            $q = $get['q'];
-            $result = preg_match('/((^|\s)is\:unread(\s|$))/', $q, $matches);
-            if ($result !== 1) {
-                $get['q'] = trim($q.' is:unread');
-            }
-        } else {
-            $get['q'] = 'is:unread';
-        }
+        $get['q'] = trim(data_get($_GET, 'q', '') . ' is:unread');
         $unreadUrl = \URL::current().'?'.http_build_query($get);
         
+        // Instead of using "is:liked" in a search query, this is handled as
+        // an entirely different route, with a link in the menu.
+        // Not sure this is a reasonable decision, but oh well
         $liked = request()->routeIs('liked');
         if ($liked) {
             $query->whereHas('likes', function ($query) {
@@ -126,6 +128,11 @@ class LinkController extends Controller
         return view('links.create', ['allTags' => $allTags]);
     }
     
+    /**
+     * Retrieve title & description meta tags for a specified URL.
+     *
+     * @return \Illuminate\Http\Response
+     */
     public function get_url_metadata(Request $request) {
         
         $title = '';
@@ -151,21 +158,29 @@ class LinkController extends Controller
             //     </rdf:Alt>
             //  </dc:title>
             // tried to use fopen and fseek from end of file, but got this error:
-            // fseek(): stream does not support seeking
+            //     "fseek(): stream does not support seeking"
             // Could use https://www.pdfparser.org/documentation but it would have to download the entire PDF
             // Probably just need to fopen and fread piece by piece, checking for title tags
         } else {
             $dom = new Dom;
-            $dom->loadFromFile($url);
-            $titleEls = $dom->find('title');
-            if ($titleEls && isset($titleEls[0])) {
-                $titleEl = $titleEls[0];
-                $title = mb_substr(html_entity_decode($titleEl->text), 0, 100);
-            }
-            $descEls = $dom->find('meta[name="description"]');
-            if ($descEls && isset($descEls[0])) {
-                $descEl = $descEls[0];
-                $description = mb_substr(html_entity_decode($descEl->getAttribute('content')), 0, 1000);
+            try {
+                $dom->loadFromFile($url);
+                $titleEls = $dom->find('title');
+                if ($titleEls && isset($titleEls[0])) {
+                    $titleEl = $titleEls[0];
+                    $title = mb_substr(html_entity_decode($titleEl->text), 0, 100);
+                }
+                $descEls = $dom->find('meta[name="description"]');
+                if ($descEls && isset($descEls[0])) {
+                    $descEl = $descEls[0];
+                    $description = mb_substr(html_entity_decode($descEl->getAttribute('content')), 0, 1000);
+                }
+            } catch (Exception $e) {
+                return response()->json([
+                    'status' => 'error',
+                    'title' => $title,
+                    'description' => $description,
+                ]);
             }
         }
         
@@ -227,43 +242,48 @@ class LinkController extends Controller
                 'unfurl_media' => false,
             ]);
         
-        $messagePosted = isset($response1->object()->ok)
+        $messagePosted = $response1 && $response1->object()
+            && isset($response1->object()->ok)
             && ($response1->object()->ok === true || $response1->object()->ok === 'true')
             && isset($response1->object()->ts);
         $response2 = null;
         
-        if ($messagePosted) {
+        if (!$messagePosted) {
+            $error = 'Error posting Slack message: '.data_get($response1->object(), 'error', '[unknown error]');
+            return redirect()
+                ->back()
+                ->withInput()
+                ->withErrors(['msg' => $error]);
+        } else {
             $link->slack_ts = $response1->object()->ts;
+            // Retrieve Slack permalink
             $response2 = Http::withToken(env('SLACK_BOT_TOKEN'))
                 ->asForm()
                 ->post('https://slack.com/api/chat.getPermalink', [
                     'channel' => env('SLACK_CHANNEL'),
                     'message_ts' => $link->slack_ts,
                 ]);
-        } else {
-            $error = 'Error posting Slack message: '.data_get($response1->object(), 'error', '[unknown error]');
-            return redirect()
-                ->back()
-                ->withInput($request->input())
-                ->withErrors(['msg' => $error]);
+                
         }
         
-        $gotPermalink = isset($response2->object()->ok)
+        $gotPermalink = $response2 && $response2->object()
+            && isset($response2->object()->ok)
             && ($response2->object()->ok === true || $response2->object()->ok === 'true')
             && isset($response2->object()->permalink);
         
-        if ($gotPermalink) {
-            $link->slack_url = $response2->object()->permalink;
-        } else {
+        if (!$gotPermalink) {
             $error = 'Error getting Slack permalink: '.data_get($response2->object(), 'error', '[unknown error]');
             return redirect()
                 ->back()
                 ->withInput()
                 ->withErrors(['msg' => $error]);
+        } else {
+            $link->slack_url = $response2->object()->permalink;
         }
         
         $link->save();
         
+        // Attach tags
         $tagIDs = [];
         foreach ($tagNames as $tagName) {
             $tag = Tag::firstOrCreate(['name' => $tagName]);
@@ -283,17 +303,6 @@ class LinkController extends Controller
     }
 
     /**
-     * Display the specified resource.
-     *
-     * @param  \App\Models\Link  $link
-     * @return \Illuminate\Http\Response
-     */
-    public function show(Link $link)
-    {
-        //
-    }
-
-    /**
      * Show the form for editing the specified resource.
      *
      * @param  \App\Models\Link  $link
@@ -301,6 +310,7 @@ class LinkController extends Controller
      */
     public function edit(Link $link)
     {
+        // Only the user who created the link can edit it
         if ($link->user_id != auth()->user()->id) {
             abort(403, 'Unauthorized action.');
         }
@@ -320,6 +330,7 @@ class LinkController extends Controller
      */
     public function update(Request $request, Link $link)
     {
+        // Only the user who created the link can edit it
         if ($link->user_id != auth()->user()->id) {
             abort(403, 'Unauthorized action.');
         }
@@ -366,6 +377,13 @@ class LinkController extends Controller
             ->with('status', __('Link updated.'));
     }
     
+    /**
+     * Update a Link in storage with user responses (read/unread, liked/unliked).
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \App\Models\Link  $link
+     * @return \Illuminate\Http\Response
+     */
     public function api_update(Request $request, Link $link) {
         $request->validate([
             'update_unread' => 'nullable|boolean',
@@ -427,8 +445,20 @@ class LinkController extends Controller
         ]);
     }
     
+    /**
+     * Endpoint for a Slack API event, which the Slack Bot is subscribed to.
+     * https://api.slack.com/apps
+     *  > [app]
+     *  > Event Subscriptions
+     *  > "Subscribe to events on behalf of users"
+     *  > "reaction_added" and "reaction_removed"
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
     public function slack_event(Request $request) {
-        // This was needed for initial url validation
+        
+        // This was needed for initial url validation when setting up the app
         // return response()->json(['challenge' => $request->challenge]);
         
         Log::info('Incoming Slack event: '.json_encode($request->all()));
@@ -501,8 +531,15 @@ class LinkController extends Controller
             ->header('X-Slack-No-Retry', 1);
     }
     
+    /**
+     * Show the form for deleting a link.
+     *
+     * @param  \App\Models\Link  $link
+     * @return \Illuminate\Http\Response
+     */
     public function delete(Link $link)
     {
+        // Only the user who created the link can delete it
         if ($link->user_id != auth()->user()->id) {
             abort(403, 'Unauthorized action.');
         }
@@ -517,6 +554,7 @@ class LinkController extends Controller
      */
     public function destroy(Link $link)
     {
+        // Only the user who created the link can delete it
         if ($link->user_id != auth()->user()->id) {
             abort(403, 'Unauthorized action.');
         }
