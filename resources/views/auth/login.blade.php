@@ -7,7 +7,7 @@
         </div>
         
         <div class="mt-4 text-lg font-semibold">
-            Récolte Links
+            {{ env('APP_NAME') }}
         </div>
 
         <div class="w-full sm:max-w-md mt-4 px-6 py-4">
