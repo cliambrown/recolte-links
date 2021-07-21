@@ -245,6 +245,8 @@ class LinkController extends Controller
         $response2 = null;
         
         if (!$messagePosted) {
+            // TODO differentiate between different Slack problems — e.g. token_removed vs missing_scope vs other errors
+            // https://api.slack.com/methods/chat.postMessage
             $error = 'Error posting Slack message: '.data_get($response1->object(), 'error', '[unknown error]');
             $needed = data_get($response1->object(), 'needed');
             if ($needed) $error .= '. Needed: '.$needed;

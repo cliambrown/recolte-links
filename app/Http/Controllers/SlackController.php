@@ -64,6 +64,7 @@ class SlackController extends Controller
     }
     
     public function scope_callback() {
+        // TODO handle errors better
         $code = data_get($_GET, 'code');
         if (!$code) return 'Authentication failed: No code.';
         $state = data_get($_GET, 'state');
