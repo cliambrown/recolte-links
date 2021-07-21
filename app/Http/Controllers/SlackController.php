@@ -79,10 +79,9 @@ class SlackController extends Controller
         if (!$response) return 'Authentication failed: No response.';
         if (!$response->ok()) return 'Authentication error: Not ok.';
         $json = $response->json();
-        dd($json);
         $token = data_get($json, 'access_token');
         if (!$token) return 'Authentication failed: no token.';
-        dd($token);
+        return 'Authentication successful. Please close this tab and retry your post.';
     }
     
     /**
