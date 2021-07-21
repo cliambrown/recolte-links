@@ -32,6 +32,7 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::get('/auth/redirect', function () {
+    // return Socialite::driver('slack')->redirect();
     $socialite = Socialite::driver('slack')->redirect();
     $url = $socialite->getTargetUrl();
     $urlParts = parse_url($url);
@@ -40,31 +41,6 @@ Route::get('/auth/redirect', function () {
     $url = $urlParts['scheme'].'://'.$urlParts['host'].$urlParts['path'].'?'.http_build_query($params);
     $socialite->setTargetUrl($url);
     return $socialite;
-    
-    
-    
-    // dd($url);
-    
-    
-    
-    // // dd($socialite->getTargetUrl());
-    // dd($socialite->setTargetUrl('test'));
-    
-    
-    // dd(Socialite::driver('slack')->redirect());
-    // // return Socialite::driver('slack')->redirect();
-    // $userScopes = [
-    //     'chat:write',
-    //     'reactions=:write',
-    // ];
-    // $params = [
-    //     'user_scope' => urlencode(implode(',',$userScopes)),
-    //     'client_id' => urlencode(env('SLACK_CLIENT_ID')),
-    //     // 'redirect_uri' => urlencode(env('SLACK_REDIRECT_CALLBACK_URL')),
-    // ];
-    // $url = 'https://slack.com/oauth/v2/authorize?'.http_build_query($params);
-    // dd($url);
-    // return redirect()->away($url);
 });
 
 Route::get('/auth/callback', function () {

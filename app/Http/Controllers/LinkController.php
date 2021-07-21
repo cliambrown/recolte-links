@@ -250,6 +250,8 @@ class LinkController extends Controller
         
         if (!$messagePosted) {
             $error = 'Error posting Slack message: '.data_get($response1->object(), 'error', '[unknown error]');
+            $needed = data_get($response1->object(), 'needed');
+            if ($needed) $error .= '. Needed: '.$needed;
             return redirect()
                 ->back()
                 ->withInput()
