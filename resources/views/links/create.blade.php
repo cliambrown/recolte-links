@@ -5,6 +5,12 @@
         </h2>
     </x-slot>
     
+    <!-- Session Status -->
+    <x-auth-session-status class="mb-4" :status="session('status')" />
+    
+    <!-- Validation Errors -->
+    <x-auth-validation-errors class="mb-4" :errors="$errors" />
+    
     @if (session('needSlackScope'))
         <p class="text-center mb-2">
             You need to give permission for this app to post to Slack on your behalf:
@@ -14,14 +20,6 @@
                 Authorize
             </x-button>
         </p>
-    @else
-        
-        <!-- Session Status -->
-        <x-auth-session-status class="mb-4" :status="session('status')" />
-        
-        <!-- Validation Errors -->
-        <x-auth-validation-errors class="mb-4" :errors="$errors" />
-    
     @endif
     
     <form method="POST" action="{{ route('links.store') }}">
