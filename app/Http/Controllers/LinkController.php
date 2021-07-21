@@ -5,12 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Link;
 use App\Models\LinkReadStatus;
 use App\Models\Tag;
-use App\Models\User;
-use App\Models\UserLike;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use PHPHtmlParser\Dom;
 
@@ -199,7 +196,6 @@ class LinkController extends Controller
      */
     public function store(Request $request)
     {
-        
         $request->validate([
             'url' => 'required|url',
             'title' => 'required|string',
@@ -255,7 +251,8 @@ class LinkController extends Controller
             return redirect()
                 ->back()
                 ->withInput()
-                ->withErrors(['msg' => $error]);
+                ->withErrors(['needSlackScope' => $error])
+                ->with('needSlackScope', true);
         } else {
             $link->slack_ts = $response1->object()->ts;
             // Retrieve Slack permalink
@@ -445,92 +442,6 @@ class LinkController extends Controller
             'liked' => $liked,
             'likes_count' => $link->likes_count,
         ]);
-    }
-    
-    /**
-     * Endpoint for a Slack API event, which the Slack Bot is subscribed to.
-     * https://api.slack.com/apps
-     *  > [app]
-     *  > Event Subscriptions
-     *  > "Subscribe to events on behalf of users"
-     *  > "reaction_added" and "reaction_removed"
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
-     */
-    public function slack_event(Request $request) {
-        
-        // This was needed for initial url validation when setting up the app
-        // return response()->json(['challenge' => $request->challenge]);
-        
-        Log::info('Incoming Slack event: '.json_encode($request->all()));
-        
-        $error = null;
-        
-        $event = data_get($request, 'event');
-        if (!$event) $error = 'Could not retrieve event.';
-        if (!$error) {
-            $type = data_get($event, 'type');
-            if ($type !== 'reaction_added' && $type !== 'reaction_removed') $error = 'Invalid event type: '.$type;
-        }
-        if (!$error) {
-            $reaction = data_get($event, 'reaction');
-            if ($reaction !== 'thumbsup' && $reaction !== '+1' && $reaction !== 'heavy_check_mark') {
-                $error = 'Invalid reaction: '.$reaction;
-            }
-        }
-        if (!$error) {
-            $channel = data_get($event, 'item.channel');
-            if ($channel !== env('SLACK_CHANNEL')) $error = 'Invalid channel: '.$channel;
-        }
-        if (!$error) {
-            $slackID = data_get($event, 'user');
-            if (!$slackID) $error = 'Could not retrieve Slack ID from payload.';
-        }
-        if (!$error) {
-            $user = User::where('slack_id', $slackID)->first();
-            if (!$user) $error = 'User not found. Slack ID: '.$slackID;
-        }
-        if (!$error) {
-            $slackTS = data_get($event, 'item.ts');
-            if (!$slackTS) $error = 'Could not retrieve Slack timestamp from payload.';
-        }
-        if (!$error) {
-            $link = Link::where('slack_ts', $slackTS)->first();
-            if (!$link) $error = 'Link not found. Slack TS: '.$slackTS;
-        }
-        
-        if ($error) {
-            Log::info('Slack event error: '.$error);
-        } else {
-            if ($reaction === 'thumbsup' || $reaction === '+1') {
-                if ($type === 'reaction_added') {
-                    UserLike::firstOrCreate([
-                        'link_id' => $link->id,
-                        'user_id' => $user->id,
-                    ]);
-                } else {
-                    UserLike::where('link_id', $link->id)
-                        ->where('user_id', $user->id)
-                        ->delete();
-                }
-            } elseif ($reaction === 'heavy_check_mark') {
-                if ($type === 'reaction_added') {
-                    LinkReadStatus::firstOrCreate([
-                        'link_id' => $link->id,
-                        'user_id' => $user->id,
-                    ]);
-                } else {
-                    LinkReadStatus::where('link_id', $link->id)
-                        ->where('user_id', $user->id)
-                        ->delete();
-                }
-            }
-        }
-        
-        return response('OK', 200)
-            ->header('Content-Type', 'text/plain')
-            ->header('X-Slack-No-Retry', 1);
     }
     
     /**

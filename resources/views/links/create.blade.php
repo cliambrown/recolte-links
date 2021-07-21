@@ -11,6 +11,17 @@
     <!-- Validation Errors -->
     <x-auth-validation-errors class="mb-4" :errors="$errors" />
     
+    @if (session('needSlackScope'))
+        <p class="text-center mb-2">
+            You need to give permission for this app to post to Slack on your behalf:
+        </p>
+        <p class="text-center mb-2">
+            <x-button href="{{ route('slack.scope_redirect') }}" target="_blank">
+                Authorize
+            </x-button>
+        </p>
+    @endif
+    
     <form method="POST" action="{{ route('links.store') }}">
         
         @csrf

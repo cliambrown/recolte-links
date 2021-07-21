@@ -33,7 +33,7 @@ return [
     'slack' => [
         'client_id' => env('SLACK_CLIENT_ID'),
         'client_secret' => env('SLACK_CLIENT_SECRET'),
-        'redirect' => env('SLACK_REDIRECT_CALLBACK_URL'),
+        'redirect' => env('APP_URL').'/auth/callback',
     ],
 
 ];
