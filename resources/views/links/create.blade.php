@@ -5,12 +5,6 @@
         </h2>
     </x-slot>
     
-    <!-- Session Status -->
-    <x-auth-session-status class="mb-4" :status="session('status')" />
-    
-    <!-- Validation Errors -->
-    <x-auth-validation-errors class="mb-4" :errors="$errors" />
-    
     @if (session('needSlackScope'))
         <p class="text-center mb-2">
             You need to give permission for this app to post to Slack on your behalf:
@@ -20,13 +14,21 @@
                 Authorize
             </x-button>
         </p>
+    @else
+        
+        <!-- Session Status -->
+        <x-auth-session-status class="mb-4" :status="session('status')" />
+        
+        <!-- Validation Errors -->
+        <x-auth-validation-errors class="mb-4" :errors="$errors" />
+    
     @endif
     
     <form method="POST" action="{{ route('links.store') }}">
         
         @csrf
         
-        <div x-data="urlMetaScraper('{{ old('url') }}', '{{ old('title') }}', '{{ old('description') }}')" x-init="checkUrl(url); $watch('url', value => checkUrl(value))">
+        <div x-data="urlMetaScraper('{{ addslashes(old('url')) }}', '{{ addslashes(old('title')) }}', '{{ addslashes(old('description')) }}')" x-init="checkUrl(url); $watch('url', value => checkUrl(value))">
             
             <div class="mb-6">
                 <x-label for="url" :value="__('URL')" />
@@ -73,7 +75,7 @@
             Short read
         </div>
         
-        <div class="mb-6" x-data="tagList('{{ old('tags') }}', {{ $allTags }})">
+        <div class="mb-6" x-data="tagList('{{ addslashes(old('tags')) }}', {{ $allTags }})">
             <x-label for="tags" :value="__('Tags')" />
             <div class="text-purple-800 text-sm">
                 Separated by commas

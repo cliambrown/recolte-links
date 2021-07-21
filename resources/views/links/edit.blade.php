@@ -22,7 +22,7 @@
         
         @method('put')
         
-        <div x-data="urlMetaScraper('{{ old('url', $link->url) }}', '{{ old('title', $link->title) }}', '{{ old('description', $link->description) }}')" x-init="checkUrl(url); $watch('url', value => checkUrl(value))">
+        <div x-data="urlMetaScraper('{{ addslashes(old('url', $link->url)) }}', '{{ addslashes(old('title', $link->title)) }}', '{{ addslashes(old('description', $link->description)) }}')" x-init="checkUrl(url); $watch('url', value => checkUrl(value))">
             
             <div class="mb-6">
                 <x-label for="url" :value="__('URL')" />
@@ -69,7 +69,7 @@
             Short read
         </div>
         
-        <div class="mb-6" x-data="tagList('{{ old('tags', $link->tags->implode('name', ', ')) }}', {{ $allTags }})">
+        <div class="mb-6" x-data="tagList('{{ addslashes(old('tags', $link->tags->implode('name', ', '))) }}', {{ $allTags }})">
             <x-label for="tags" :value="__('Tags')" />
             <div class="text-purple-800 text-sm">
                 Separated by commas

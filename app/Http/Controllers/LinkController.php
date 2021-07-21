@@ -251,7 +251,7 @@ class LinkController extends Controller
             return redirect()
                 ->back()
                 ->withInput()
-                ->withErrors(['needSlackScope' => $error])
+                ->withErrors(['msg' => $error])
                 ->with('needSlackScope', true);
         } else {
             $link->slack_ts = $response1->object()->ts;
