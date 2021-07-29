@@ -223,10 +223,10 @@ class LinkController extends Controller
             $link->is_short = true;
         }
         
-        $slackText = '*'.$link->title.'*'."\n";
-        $slackText .= $link->url."\n";
+        $slackText = '*'.slack_special_chars($link->title).'*'."\n";
+        $slackText .= slack_special_chars($link->url)."\n";
         if ($link->is_short) $slackText .= '[short] ';
-        $slackText .= $link->description."\n";
+        $slackText .= slack_special_chars($link->description)."\n";
         $slackText .= '_tags: '.$tagNames->implode(', ').'_';
         
         $response1 = Http::withToken(auth()->user()->slack_token)
