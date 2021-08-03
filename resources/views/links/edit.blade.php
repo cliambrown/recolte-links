@@ -22,7 +22,7 @@
         
         @method('put')
         
-        <div x-data="urlMetaScraper('{{ addslashes(old('url', $link->url)) }}', '{{ addslashes(old('title', $link->title)) }}', '{{ addslashes(old('description', $link->description)) }}')" x-init="checkUrl(url); $watch('url', value => checkUrl(value))">
+        <div x-data="urlMetaScraper('{{ addslashes(old('url', $link->url)) }}', '{{ sanitize_for_js(old('title', $link->title)) }}', '{{ sanitize_for_js(old('description', $link->description)) }}')" x-init="checkUrl(url); $watch('url', value => checkUrl(value))">
             
             <div class="mb-6">
                 <x-label for="url" :value="__('URL')" />

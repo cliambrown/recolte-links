@@ -219,7 +219,7 @@ class LinkController extends Controller
         $link->url = $request->url;
         $link->title = $request->title;
         $link->description = $request->description;
-        if ($request->is_short) {
+        if (get_request_boolean($request->is_short)) {
             $link->is_short = true;
         }
         
@@ -358,7 +358,7 @@ class LinkController extends Controller
         $link->url = $request->url;
         $link->title = $request->title;
         $link->description = $request->description;
-        if ($request->is_short) {
+        if (get_request_boolean($request->is_short)) {
             $link->is_short = true;
         } else {
             $link->is_short = null;

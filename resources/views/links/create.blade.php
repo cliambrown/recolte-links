@@ -26,7 +26,7 @@
         
         @csrf
         
-        <div x-data="urlMetaScraper('{{ addslashes(old('url')) }}', '{{ addslashes(old('title')) }}', '{{ addslashes(old('description')) }}')" x-init="checkUrl(url); $watch('url', value => checkUrl(value))">
+        <div x-data="urlMetaScraper('{{ addslashes(old('url')) }}', '{{ sanitize_for_js(old('title')) }}', '{{ sanitize_for_js(old('description')) }}')" x-init="checkUrl(url); $watch('url', value => checkUrl(value))">
             
             <div class="mb-6">
                 <x-label for="url" :value="__('URL')" />
