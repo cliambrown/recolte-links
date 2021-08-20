@@ -82,6 +82,8 @@ class SlackController extends Controller
         $json = $response->json();
         $token = data_get($json, 'access_token');
         if (!$token) return 'Authentication failed: no token.';
+        $user = auth()->user();
+        $user->update(['slack_token' => $token]);
         return 'Authentication successful. Please close this tab and retry your post.';
     }
     
